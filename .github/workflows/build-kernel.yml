@@ -25,16 +25,18 @@ jobs:
           sudo apt-get install -y bc bison flex libssl-dev make python3 \
             libncurses-dev kmod cpio ccache lz4 zstd libelf-dev
 
-      - name: Download Clang toolchain
+      - name: Install Clang + LLVM
         run: |
-          # Download Android AOSP prebuilt Clang
-          mkdir -p /tmp/toolchain
-          cd /tmp/toolchain
-          curl -L -o clang.tar.gz \
-            "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz"
-          mkdir clang
-          cd clang && tar xzf ../clang.tar.gz && cd ..
-          echo "/tmp/toolchain/clang/bin" >> $GITHUB_PATH
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/llvm.asc
+          sudo add-apt-repository -y 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main'
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 llvm-18
+          # Symlink so CC=clang works without version suffix
+          sudo ln -sf /usr/bin/clang-18 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-18 /usr/local/bin/clang++
+          sudo ln -sf /usr/bin/ld.lld-18 /usr/local/bin/ld.lld
+          sudo ln -sf /usr/bin/llvm-ar-18 /usr/local/bin/llvm-ar
+          clang --version
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
@@ -72,7 +74,10 @@ jobs:
 
       - name: Build
         run: |
-          export PATH="/tmp/toolchain/clang/bin:$PATH"
+          export CC=clang
+          export LD=ld.lld
+          export LLVM=1
+          export LLVM_IAS=1
           make -j$(nproc) ARCH=arm64 CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 2>&1 | tee build.log
 
       - name: Package
