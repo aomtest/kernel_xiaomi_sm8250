@@ -52,8 +52,22 @@ jobs:
       - name: Package
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth 1
-          cp arch/arm64/boot/Image AnyKernel3/
-          cat > AnyKernel3/anykernel.sh <<- EOS
+
+          # Find the kernel image (could be Image or Image.gz)
+          if [ -f arch/arm64/boot/Image ]; then
+            KERNEL_IMG=arch/arm64/boot/Image
+          elif [ -f arch/arm64/boot/Image.gz ]; then
+            gunzip arch/arm64/boot/Image.gz
+            KERNEL_IMG=arch/arm64/boot/Image
+          else
+            echo "ERROR: No kernel image found!"
+            ls -la arch/arm64/boot/
+            exit 1
+          fi
+
+          cp $KERNEL_IMG AnyKernel3/
+
+          cat > AnyKernel3/anykernel.sh <<- 'EOS'
             kernel.string=Hermes KSU Mi10Pro cmi
             do.devicecheck=1
             do.initd=0
@@ -67,6 +81,7 @@ jobs:
             ramdisk_compression=auto
             patch_vbmeta_flag=auto
           EOS
+
           cd AnyKernel3 && rm -rf .git README.md *placeholder
           zip -r9 ../Hermes-KSU-cmi-4.19.325.zip . && cd ..
 
