@@ -1,4 +1,4 @@
-name: 🔨 Build Kernel (KSU + suSFS)
+name: 🔨 Build Kernel (KSU Only)
 
 on:
   workflow_dispatch:
@@ -33,35 +33,16 @@ jobs:
           key: k419
           max-size: 5G
 
-      - name: Apply KernelSU (v1.0.3)
+      - name: Apply KernelSU (latest)
         run: |
-          git clone https://github.com/tiann/KernelSU.git --depth 1 --branch v1.0.3
+          git clone https://github.com/tiann/KernelSU.git --depth 1
           ln -sf ../KernelSU KernelSU
-
-      - name: Apply suSFS patches
-        run: |
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.19 --depth 1
-
-          cp susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU/
-          cd KernelSU && patch -p1 < 10_enable_susfs_for_ksu.patch; cd "$OLDPWD"
-
-          cp susfs4ksu/kernel_patches/fs/susfs.c fs/
-          cp susfs4ksu/kernel_patches/fs/sus_su.c fs/
-          cp -r susfs4ksu/kernel_patches/include/linux/* include/linux/
-
-          patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch || true
 
       - name: Configure
         run: |
           make ARCH=arm64 cmi_defconfig
           ./scripts/config --enable CONFIG_KPROBES
           ./scripts/config --enable CONFIG_KSU
-          ./scripts/config --enable CONFIG_KSU_SUSFS
-          ./scripts/config --enable CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
-          ./scripts/config --enable CONFIG_KSU_SUSFS_SUS_PATH
-          ./scripts/config --enable CONFIG_KSU_SUSFS_SUS_MOUNT
-          ./scripts/config --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_RULES
-          ./scripts/config --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNTS
           ./scripts/config --set-str CONFIG_LOCALVERSION -HermesKSU
 
       - name: Build
@@ -73,7 +54,7 @@ jobs:
           git clone https://github.com/osm0sis/AnyKernel3.git --depth 1
           cp arch/arm64/boot/Image AnyKernel3/
           cat > AnyKernel3/anykernel.sh <<- EOS
-            kernel.string=Hermes KSU+suSFS Mi10Pro cmi
+            kernel.string=Hermes KSU Mi10Pro cmi
             do.devicecheck=1
             do.initd=0
             do.modules=0
@@ -87,13 +68,13 @@ jobs:
             patch_vbmeta_flag=auto
           EOS
           cd AnyKernel3 && rm -rf .git README.md *placeholder
-          zip -r9 ../Hermes-KSU_suSFS-cmi-4.19.325.zip . && cd ..
+          zip -r9 ../Hermes-KSU-cmi-4.19.325.zip . && cd ..
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Hermes-KSU_suSFS-cmi-4.19.325
+          name: Hermes-KSU-cmi-4.19.325
           path: |
-            Hermes-KSU_suSFS-cmi-4.19.325.zip
+            Hermes-KSU-cmi-4.19.325.zip
             build.log
           retention-days: 7
