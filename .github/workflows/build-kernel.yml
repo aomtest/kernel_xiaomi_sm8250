@@ -33,19 +33,22 @@ jobs:
           key: k419
           max-size: 5G
 
-      - name: Apply KernelSU
+      - name: Apply KernelSU (v1.0.3)
         run: |
-          git clone https://github.com/tiann/KernelSU.git --depth 1
+          git clone https://github.com/tiann/KernelSU.git --depth 1 --branch v1.0.3
           ln -sf ../KernelSU KernelSU
 
-      - name: Apply suSFS
+      - name: Apply suSFS patches
         run: |
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.19 --depth 1
+
           cp susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU/
           cd KernelSU && patch -p1 < 10_enable_susfs_for_ksu.patch && cd ..
+
           cp susfs4ksu/kernel_patches/fs/susfs.c fs/
           cp susfs4ksu/kernel_patches/fs/sus_su.c fs/
           cp -r susfs4ksu/kernel_patches/include/linux/* include/linux/
+
           patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch || true
 
       - name: Configure
