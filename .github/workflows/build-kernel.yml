@@ -1,0 +1,99 @@
+name: 🔨 Build Kernel (KSU + suSFS)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "sixteen-qpr2" ]
+
+env:
+  DEFCONFIG: cmi_defconfig
+  ARCH: arm64
+
+jobs:
+  build:
+    name: Build Kernel 4.19.325
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sixteen-qpr2
+          fetch-depth: 1
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev make python3 \
+            libncurses-dev kmod cpio ccache lz4 zstd libelf-dev
+
+      - name: Setup Clang
+        uses: nathanchance/actions-setup-clang@v1
+        with:
+          clang_version: 18
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: k419-ci
+          max-size: 5G
+
+      - name: Apply KernelSU
+        run: |
+          git clone https://github.com/tiann/KernelSU.git --depth 1
+          ln -sf ../KernelSU KernelSU
+
+      - name: Apply suSFS
+        run: |
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.19 --depth 1
+          cp susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU/
+          cd KernelSU && patch -p1 < 10_enable_susfs_for_ksu.patch && cd ..
+          cp susfs4ksu/kernel_patches/fs/susfs.c fs/
+          cp susfs4ksu/kernel_patches/fs/sus_su.c fs/
+          cp -r susfs4ksu/kernel_patches/include/linux/* include/linux/
+          patch -p1 < susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.19.patch || true
+
+      - name: Configure
+        run: |
+          make ARCH=arm64 CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 cmi_defconfig
+          ./scripts/config --enable CONFIG_KPROBES
+          ./scripts/config --enable CONFIG_KSU
+          ./scripts/config --enable CONFIG_KSU_SUSFS
+          ./scripts/config --enable CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
+          ./scripts/config --enable CONFIG_KSU_SUSFS_SUS_PATH
+          ./scripts/config --enable CONFIG_KSU_SUSFS_SUS_MOUNT
+          ./scripts/config --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_RULES
+          ./scripts/config --enable CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNTS
+          ./scripts/config --set-str CONFIG_LOCALVERSION -HermesKSU
+
+      - name: Build
+        run: |
+          make -j$(nproc) ARCH=arm64 CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 2>&1 | tee build.log
+
+      - name: Package
+        run: |
+          git clone https://github.com/osm0sis/AnyKernel3.git --depth 1
+          cp arch/arm64/boot/Image AnyKernel3/
+          cat > AnyKernel3/anykernel.sh << 'EOS'
+kernel.string=Hermes KSU+suSFS Mi10Pro cmi
+do.devicecheck=1
+do.initd=0
+do.modules=0
+do.systemless=0
+device.name1=cmi
+device.name2=Mi10Pro
+device.name3=Mi 10 Pro
+block=/dev/block/bootdevice/by-name/boot
+is_slot_device=auto
+ramdisk_compression=auto
+patch_vbmeta_flag=auto
+EOS
+          cd AnyKernel3 && rm -rf .git README.md *placeholder
+          zip -r9 ../Hermes-KSU_suSFS-cmi-4.19.325.zip . && cd ..
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hermes-KSU_suSFS-cmi-4.19.325
+          path: |
+            Hermes-KSU_suSFS-cmi-4.19.325.zip
+            build.log
+          retention-days: 7
