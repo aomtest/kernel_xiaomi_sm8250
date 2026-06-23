@@ -72,20 +72,20 @@ jobs:
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth 1
           cp arch/arm64/boot/Image AnyKernel3/
-          cat > AnyKernel3/anykernel.sh << 'EOS'
-kernel.string=Hermes KSU+suSFS Mi10Pro cmi
-do.devicecheck=1
-do.initd=0
-do.modules=0
-do.systemless=0
-device.name1=cmi
-device.name2=Mi10Pro
-device.name3=Mi 10 Pro
-block=/dev/block/bootdevice/by-name/boot
-is_slot_device=auto
-ramdisk_compression=auto
-patch_vbmeta_flag=auto
-EOS
+          cat > AnyKernel3/anykernel.sh <<- EOS
+            kernel.string=Hermes KSU+suSFS Mi10Pro cmi
+            do.devicecheck=1
+            do.initd=0
+            do.modules=0
+            do.systemless=0
+            device.name1=cmi
+            device.name2=Mi10Pro
+            device.name3=Mi 10 Pro
+            block=/dev/block/bootdevice/by-name/boot
+            is_slot_device=auto
+            ramdisk_compression=auto
+            patch_vbmeta_flag=auto
+          EOS
           cd AnyKernel3 && rm -rf .git README.md *placeholder
           zip -r9 ../Hermes-KSU_suSFS-cmi-4.19.325.zip . && cd ..
 
