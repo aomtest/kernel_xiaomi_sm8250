@@ -25,10 +25,16 @@ jobs:
           sudo apt-get install -y bc bison flex libssl-dev make python3 \
             libncurses-dev kmod cpio ccache lz4 zstd libelf-dev
 
-      - name: Setup Clang
-        uses: nathanchance/actions-setup-clang@v1
-        with:
-          clang_version: 18
+      - name: Download Clang toolchain
+        run: |
+          # Download Android AOSP prebuilt Clang
+          mkdir -p /tmp/toolchain
+          cd /tmp/toolchain
+          curl -L -o clang.tar.gz \
+            "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r522817.tar.gz"
+          mkdir clang
+          cd clang && tar xzf ../clang.tar.gz && cd ..
+          echo "/tmp/toolchain/clang/bin" >> $GITHUB_PATH
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
@@ -53,7 +59,7 @@ jobs:
 
       - name: Configure
         run: |
-          make ARCH=arm64 CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 cmi_defconfig
+          make ARCH=arm64 cmi_defconfig
           ./scripts/config --enable CONFIG_KPROBES
           ./scripts/config --enable CONFIG_KSU
           ./scripts/config --enable CONFIG_KSU_SUSFS
@@ -66,6 +72,7 @@ jobs:
 
       - name: Build
         run: |
+          export PATH="/tmp/toolchain/clang/bin:$PATH"
           make -j$(nproc) ARCH=arm64 CC=clang LD=ld.lld LLVM=1 LLVM_IAS=1 2>&1 | tee build.log
 
       - name: Package
